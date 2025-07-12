@@ -1,10 +1,11 @@
-
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, CallbackContext
+import os
 
 TOKEN = "8122510813:AAHOpgwNJqUWUhuo01Wl0FywRS40sBARhR0"
-CHAT_ID = "7786764846"
+ADMIN_CHAT_ID = "7786764846"
+
 WALLETS = {
     "TRC20": "TQw19dGhSNeryY3eDX3byeD4KsThyNdCLU",
     "BEP20": "0x7a210fc89eccfaed2ea25cc27446e44743533ac2",
@@ -13,55 +14,68 @@ WALLETS = {
     "SOL": "3uUsgFUUUJLx5rYJ786rgcBozaxtFLvoSv1a2xvfbKrh"
 }
 
-logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
-
-def start(update: Update, context: CallbackContext):
+def start(update: Update, context: CallbackContext) -> None:
     keyboard = [
         [InlineKeyboardButton("TRC20", callback_data='TRC20')],
         [InlineKeyboardButton("BEP20", callback_data='BEP20')],
         [InlineKeyboardButton("ERC20", callback_data='ERC20')],
         [InlineKeyboardButton("BTC", callback_data='BTC')],
-        [InlineKeyboardButton("SOL", callback_data='SOL')]
+        [InlineKeyboardButton("SOL", callback_data='SOL')],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    update.message.reply_text("Выберите сеть для оплаты:", reply_markup=reply_markup)
+    update.message.reply_text('Выберите сеть для оплаты:', reply_markup=reply_markup)
 
-def button(update: Update, context: CallbackContext):
+def button(update: Update, context: CallbackContext) -> None:
     query = update.callback_query
-    query.answer()
     network = query.data
-    address = WALLETS[network]
-    message = f"💸 <b>Отправьте $35</b> на адрес в сети <b>{network}</b>:
+    wallet = WALLETS.get(network)
+    message = f"💳 <b>Отправьте $35</b> на адрес в сети <b>{network}</b>: 
+<code>{wallet}</code>"
+    keyboard = [
+        [InlineKeyboardButton("✅ Я оплатил", callback_data=f"confirm_{network}")],
+        [InlineKeyboardButton("❌ Отменить", callback_data="cancel")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    query.edit_message_text(text=message, parse_mode='HTML', reply_markup=reply_markup)
 
-<code>{address}</code>
-
-После отправки нажмите кнопку ниже."
-    keyboard = [[InlineKeyboardButton("✅ Я оплатил", callback_data='paid')],
-                [InlineKeyboardButton("❌ Отменить", callback_data='cancel')]]
-    query.edit_message_text(text=message, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='HTML')
-
-def paid(update: Update, context: CallbackContext):
+def confirm(update: Update, context: CallbackContext) -> None:
     query = update.callback_query
-    query.answer()
     user = query.from_user
-    context.bot.send_message(chat_id=CHAT_ID, text=f"💰 <b>Оплата</b> от @{user.username or user.first_name}
-Нужно проверить и подтвердить вручную.", parse_mode='HTML')
-    query.edit_message_text("Платёж отправлен. Ожидайте подтверждение.")
+    network = query.data.split("_")[1]
+    wallet = WALLETS.get(network)
+    context.bot.send_message(
+        chat_id=ADMIN_CHAT_ID,
+        text=(
+            f"🧾 Новый запрос на открытие счёта
+"
+            f"Имя: {user.full_name}
+"
+            f"Юзер: @{user.username}
+"
+            f"Сеть: {network}
+"
+            f"Кошелёк: {wallet}
 
-def cancel(update: Update, context: CallbackContext):
+"
+            f"Подтвердите оплату и отправьте пользователю номер счёта вручную."
+        )
+    )
+    query.edit_message_text("Спасибо! Ваша заявка на открытие счёта отправлена. Ожидайте подтверждения.")
+
+def cancel(update: Update, context: CallbackContext) -> None:
     query = update.callback_query
-    query.answer()
     query.edit_message_text("Обратитесь в техподдержку. К сожалению, не удаётся обнаружить ваш платёж. Напишите, пожалуйста, в Telegram: @secondlang_support")
 
-def main():
+def main() -> None:
     updater = Updater(TOKEN)
-    dp = updater.dispatcher
-    dp.add_handler(CommandHandler("start", start))
-    dp.add_handler(CallbackQueryHandler(button, pattern='^(TRC20|BEP20|ERC20|BTC|SOL)$'))
-    dp.add_handler(CallbackQueryHandler(paid, pattern='^paid$'))
-    dp.add_handler(CallbackQueryHandler(cancel, pattern='^cancel$'))
+    dispatcher = updater.dispatcher
+    dispatcher.add_handler(CommandHandler('start', start))
+    dispatcher.add_handler(CallbackQueryHandler(confirm, pattern='^confirm_'))
+    dispatcher.add_handler(CallbackQueryHandler(cancel, pattern='^cancel$'))
+    dispatcher.add_handler(CallbackQueryHandler(button))
     updater.start_polling()
     updater.idle()
 
 if __name__ == '__main__':
+    logging.basicConfig(level=logging.INFO)
     main()
