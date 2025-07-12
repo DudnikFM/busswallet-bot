@@ -46,7 +46,7 @@ async def show_wallet(callback: types.CallbackQuery):
         [InlineKeyboardButton(text="✅ Я оплатил", callback_data="paid")]
     ])
     await callback.message.edit_text(
-        f"💰 Отправьте <b>${OPENING_FEE}</b> на адрес в сети <b>{net}</b>:
+f"💳 Отправьте <b>{OPENING_FEE}</b> на адрес в сети <b>{net}</b>:"
 <code>{wallet}</code>
 
 После отправки нажмите кнопку ниже.",
